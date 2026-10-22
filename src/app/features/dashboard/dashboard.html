@@ -1,0 +1,300 @@
+@let m = metrics();
+
+<app-page-header
+  eyebrow="Vue d’ensemble"
+  [title]="dayGreeting + ', ' + ownerFirstName() + '.'"
+  [subtitle]="periodSubtitle()"
+  [crumbs]="[{ label: 'Kora', path: '/tableau-de-bord' }, { label: 'Tableau de bord' }]"
+>
+  <div page-actions>
+    <div class="kora-segmented" role="group" aria-label="Période d’analyse">
+      @for (option of periodOptions; track option.key) {
+        <button
+          type="button"
+          [attr.aria-pressed]="period() === option.key"
+          (click)="changePeriod(option.key)"
+        >
+          {{ option.short }}
+        </button>
+      }
+    </div>
+    <button
+      type="button"
+      class="kora-btn kora-btn--outline kora-btn--icon no-print"
+      (click)="printReport()"
+      title="Imprimer le rapport"
+      aria-label="Imprimer le rapport du tableau de bord"
+    >
+      <app-icon name="printer" [size]="17" />
+    </button>
+  </div>
+</app-page-header>
+
+<section class="kpis" aria-label="Indicateurs clés de la période">
+  <app-stat-card
+    label="Chiffre d’affaires"
+    [value]="formatXof(m.revenue)"
+    hint="Ventes enregistrées sur la période"
+    [delta]="showDelta() ? m.deltas.revenue : undefined"
+    icon="receipt"
+    [spark]="revenueSpark()"
+  />
+  <app-stat-card
+    label="Encaissements"
+    [value]="formatXof(m.cashIn)"
+    hint="Argent réellement reçu"
+    [delta]="showDelta() ? m.deltas.cashIn : undefined"
+    tone="mint"
+    icon="banknote"
+    [spark]="cashSpark()"
+  />
+  <app-stat-card
+    label="Marge brute estimée"
+    [value]="formatXof(m.grossMargin)"
+    [hint]="'Taux de marge ' + m.grossMarginRate + ' % · coût marchandises déduit'"
+    icon="layers"
+  />
+  <app-stat-card
+    label="Résultat estimé"
+    [value]="formatXof(m.netResult)"
+    hint="Marge brute moins les dépenses"
+    [delta]="showDelta() ? m.deltas.netResult : undefined"
+    tone="amber"
+    icon="wallet"
+  />
+</section>
+
+<section class="mini-strip kora-card" aria-label="Indicateurs complémentaires">
+  <article class="mini">
+    <p class="mini__label">Dépenses</p>
+    <p class="mini__value kora-num mini__value--amber">{{ formatXof(m.expenses) }}</p>
+    <p class="mini__hint">N’affectent pas le chiffre d’affaires</p>
+  </article>
+  <article class="mini">
+    <p class="mini__label">Ventes</p>
+    <p class="mini__value kora-num">{{ m.salesCount }}</p>
+    <p class="mini__hint">Panier moyen {{ formatXof(m.averageSale) }}</p>
+  </article>
+  <article class="mini">
+    <p class="mini__label">Solde à recevoir</p>
+    <p class="mini__value kora-num">{{ formatXof(m.outstanding) }}</p>
+    <p class="mini__hint">{{ m.outstanding > 0 ? 'Créances de la période' : 'Tout est encaissé' }}</p>
+  </article>
+  <article class="mini">
+    <p class="mini__label">Stock à surveiller</p>
+    <p class="mini__value kora-num" [class.mini__value--danger]="m.lowStock.length > 0">
+      {{ m.lowStock.length }}
+    </p>
+    <p class="mini__hint">{{ m.outOfStock }} rupture(s) · {{ m.totalProducts }} références</p>
+  </article>
+</section>
+
+<div class="dash-grid">
+  <section class="kora-card chart-card" aria-labelledby="chart-title">
+    <div class="chart-card__head">
+      <div>
+        <p class="kora-eyebrow">Activité</p>
+        <h2 id="chart-title">Ventes et encaissements</h2>
+      </div>
+      <span class="period-chip">{{ m.range.label }}</span>
+    </div>
+    <app-sales-chart [series]="m.series" />
+    <div class="chart-card__footer">
+      <span><i class="dot dot--forest"></i> Ventes facturées <strong>{{ formatXof(m.revenue) }}</strong></span>
+      <span><i class="dot dot--amber"></i> Encaissements <strong>{{ formatXof(m.cashIn) }}</strong></span>
+      <span class="chart-card__rate">{{ m.grossMarginRate }} % de marge brute</span>
+    </div>
+  </section>
+
+  <div class="side-stack">
+    <section class="kora-card split-card" aria-labelledby="split-title">
+      <div class="card-head">
+        <div>
+          <p class="kora-eyebrow">Trésorerie</p>
+          <h2 id="split-title">Encaissements par moyen</h2>
+        </div>
+        <span class="card-head__total kora-num">{{ formatXof(m.cashIn) }}</span>
+      </div>
+
+      @if (m.paymentBreakdown.length) {
+        <div class="split-list">
+          @for (item of m.paymentBreakdown; track item.method) {
+            <div class="split-row">
+              <span class="split-icon" aria-hidden="true">
+                <app-icon [name]="paymentIcon(item.method)" [size]="16" />
+              </span>
+              <div class="split-body">
+                <div class="split-top">
+                  <span>{{ item.label }}</span>
+                  <strong class="kora-num">{{ formatXof(item.amount) }}</strong>
+                </div>
+                <div
+                  class="bar"
+                  role="img"
+                  [attr.aria-label]="item.label + ' : ' + item.share + ' % des encaissements'"
+                >
+                  <span [class]="paymentTone(item.method)" [style.width.%]="item.share"></span>
+                </div>
+                <p class="split-meta">{{ item.share }} % · {{ item.count }} paiement{{ item.count > 1 ? 's' : '' }}</p>
+              </div>
+            </div>
+          }
+        </div>
+      } @else {
+        <div class="split-empty">
+          <span class="split-empty__icon"><app-icon name="banknote" [size]="20" /></span>
+          <p>Aucun encaissement sur cette période.</p>
+          <a routerLink="/vente" class="kora-link">Enregistrer une vente</a>
+        </div>
+      }
+
+      <div class="split-foot">
+        <app-icon name="info" [size]="14" />
+        <span>Le solde dû n’est pas compté comme un encaissement.</span>
+      </div>
+    </section>
+
+    <section class="kora-card today-card" aria-labelledby="today-title">
+      <div class="card-head">
+        <div>
+          <p class="kora-eyebrow">Clôture</p>
+          <h2 id="today-title">Rapport du jour</h2>
+        </div>
+        <span class="today-card__date">{{ todayLabel }}</span>
+      </div>
+
+      <dl class="today-list">
+        <div>
+          <dt>Ventes du jour</dt>
+          <dd class="kora-num">{{ formatXof(today().revenue) }}</dd>
+        </div>
+        <div>
+          <dt>Encaissé</dt>
+          <dd class="kora-num">{{ formatXof(today().cashIn) }}</dd>
+        </div>
+        <div>
+          <dt>Dépenses</dt>
+          <dd class="kora-num">{{ formatXof(today().expenses) }}</dd>
+        </div>
+      </dl>
+
+      <div class="today-card__foot">
+        <span>{{ today().salesCount }} vente{{ today().salesCount > 1 ? 's' : '' }} aujourd’hui</span>
+        <button type="button" class="kora-btn kora-btn--outline kora-btn--sm no-print" (click)="printReport()">
+          <app-icon name="printer" [size]="14" />
+          Imprimer
+        </button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="bottom-grid">
+  <section class="kora-card activity-card" aria-labelledby="recent-title">
+    <div class="card-head">
+      <div>
+        <p class="kora-eyebrow">Journal</p>
+        <h2 id="recent-title">Dernières transactions</h2>
+      </div>
+      <a routerLink="/transactions" class="card-link">
+        Tout voir
+        <app-icon name="arrow-right" [size]="14" />
+      </a>
+    </div>
+
+    @if (recentSales().length) {
+      <ul class="activity-list">
+        @for (sale of recentSales(); track sale.id) {
+          <li>
+            <a
+              class="activity-row"
+              [routerLink]="['/transactions']"
+              [queryParams]="{ sale: sale.id }"
+              [attr.aria-label]="'Ouvrir la vente ' + sale.reference"
+            >
+              <span class="activity-icon" aria-hidden="true">
+                <app-icon name="receipt" [size]="17" />
+              </span>
+              <span class="activity-main">
+                <span class="activity-ref">{{ sale.reference }}</span>
+                <span class="activity-sub">{{ saleCustomer(sale) }} · {{ formatTime(sale.createdAt) }}</span>
+              </span>
+              <span class="activity-right">
+                <span class="activity-amount kora-num">{{ formatXof(sale.totalAmount) }}</span>
+                <app-status-badge [status]="sale.status" />
+              </span>
+              <app-icon name="chevron-right" [size]="14" class="activity-chevron" />
+            </a>
+          </li>
+        }
+      </ul>
+    } @else {
+      <div class="activity-empty">
+        <p>Aucune vente enregistrée pour le moment.</p>
+        <a routerLink="/vente" class="kora-btn kora-btn--primary kora-btn--sm">
+          <app-icon name="plus" [size]="15" />
+          Nouvelle vente
+        </a>
+      </div>
+    }
+  </section>
+
+  <section class="kora-card stock-card" aria-labelledby="stock-title">
+    <div class="card-head">
+      <div>
+        <p class="kora-eyebrow">Réapprovisionnement</p>
+        <h2 id="stock-title">Alertes de stock</h2>
+      </div>
+      <span class="count-chip" [class.count-chip--danger]="m.lowStock.length > 0">{{ m.lowStock.length }}</span>
+    </div>
+
+    @if (lowStockPreview().length) {
+      <ul class="stock-list">
+        @for (product of lowStockPreview(); track product.id) {
+          <li>
+            <div class="stock-row">
+              <span class="stock-dot" [class.stock-dot--out]="product.stockQuantity <= 0" aria-hidden="true"></span>
+              <div class="stock-main">
+                <div class="stock-top">
+                  <span class="stock-name">{{ product.name }}</span>
+                  <span class="stock-qty kora-num" [class.stock-qty--out]="product.stockQuantity <= 0">
+                    {{ product.stockQuantity }} {{ product.unit ?? 'u.' }}
+                  </span>
+                </div>
+                <div class="bar bar--thin" aria-hidden="true">
+                  <span
+                    [class]="product.stockQuantity <= 0 ? 'bar--danger' : 'bar--amber'"
+                    [style.width.%]="stockPercent(product)"
+                  ></span>
+                </div>
+                <p class="stock-meta">
+                  Seuil d’alerte : {{ product.lowStockThreshold }} · {{ product.category ?? 'Sans catégorie' }}
+                </p>
+              </div>
+            </div>
+          </li>
+        }
+      </ul>
+      <a routerLink="/produits" class="card-link stock-card__link">
+        Gérer le stock
+        <app-icon name="arrow-right" [size]="14" />
+      </a>
+    } @else {
+      <div class="stock-ok">
+        <span class="stock-ok__icon"><app-icon name="check" [size]="20" /></span>
+        <div>
+          <p class="stock-ok__title">Tout est approvisionné</p>
+          <p class="stock-ok__text">Aucun produit sous son seuil d’alerte.</p>
+        </div>
+      </div>
+    }
+  </section>
+</div>
+
+<section class="footnote no-print">
+  <app-icon name="lock" [size]="14" />
+  <p>
+    Données de démonstration enregistrées uniquement sur cet appareil. Elles ne constituent pas une
+    comptabilité certifiée : taxes et charges non saisies ne sont pas incluses.
+  </p>
+</section>

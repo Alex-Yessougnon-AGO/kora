@@ -1,0 +1,360 @@
+<app-page-header
+  eyebrow="Encaissement"
+  title="Nouvelle vente"
+  subtitle="Composez le panier, vérifiez le stock disponible et encaissez en quelques secondes."
+  [crumbs]="[{ label: 'Kora', path: '/tableau-de-bord' }, { label: 'Nouvelle vente' }]"
+>
+  <div page-actions>
+    <a routerLink="/produits" class="kora-btn kora-btn--outline">
+      <app-icon name="box" [size]="16" />
+      Gérer le stock
+    </a>
+    @if (cart().length) {
+      <button type="button" class="kora-btn kora-btn--ghost" (click)="clearCart()">
+        <app-icon name="trash" [size]="15" />
+        Vider
+      </button>
+    }
+  </div>
+</app-page-header>
+
+<p class="sr-only" aria-live="polite">{{ liveMessage() }}</p>
+
+<div class="sale-layout">
+  <section class="catalog kora-card" aria-labelledby="catalog-title">
+    <div class="catalog__head">
+      <div>
+        <p class="kora-eyebrow">Catalogue</p>
+        <h2 id="catalog-title">Choisir les produits</h2>
+      </div>
+      <span class="catalog__count">{{ filteredProducts().length }} référence{{ filteredProducts().length > 1 ? 's' : '' }}</span>
+    </div>
+
+    <div class="catalog__search">
+      <app-icon name="search" [size]="17" class="search-icon" />
+      <label for="sale-search" class="sr-only">Rechercher un produit</label>
+      <input
+        id="sale-search"
+        type="search"
+        [value]="search()"
+        (input)="setSearch($event)"
+        placeholder="Rechercher un produit, une référence…"
+        class="search-input"
+      />
+      @if (search()) {
+        <button type="button" class="search-clear" (click)="search.set('')" aria-label="Effacer la recherche">
+          <app-icon name="x" [size]="15" />
+        </button>
+      }
+    </div>
+
+    <div class="chip-row" role="group" aria-label="Filtrer par catégorie">
+      @for (option of categoryOptions(); track option) {
+        <button
+          type="button"
+          class="chip"
+          [attr.aria-pressed]="category() === option"
+          (click)="category.set(option)"
+        >
+          {{ option }}
+        </button>
+      }
+    </div>
+
+    @if (filteredProducts().length) {
+      <div class="product-grid">
+        @for (product of filteredProducts(); track product.id) {
+          <button
+            type="button"
+            class="product-card"
+            [class.product-card--out]="product.stockQuantity <= 0"
+            [class.product-card--selected]="productQuantity(product.id) > 0"
+            [disabled]="product.stockQuantity <= 0"
+            (click)="addProduct(product)"
+            [attr.aria-label]="
+              product.stockQuantity > 0
+                ? 'Ajouter ' + product.name + ' au panier, ' + formatXof(product.sellingPrice)
+                : product.name + ' est en rupture de stock'
+            "
+          >
+            <span class="product-card__top">
+              <span class="product-card__cat">{{ product.category ?? 'Divers' }}</span>
+              <span [class]="'stock-pill stock-pill--' + stockTone(product)">
+                {{ stockLabel(product) }}
+              </span>
+            </span>
+            <span class="product-card__name">{{ product.name }}</span>
+            <span class="product-card__meta">
+              {{ product.sku ?? 'Sans référence' }} · marge {{ marginOf(product) }} %
+            </span>
+            <span class="product-card__bottom">
+              <span class="product-card__price kora-num">{{ formatXof(product.sellingPrice) }}</span>
+              <span class="product-add" aria-hidden="true">
+                <app-icon [name]="product.stockQuantity > 0 ? 'plus' : 'lock'" [size]="15" />
+              </span>
+            </span>
+            @if (productQuantity(product.id) > 0) {
+              <span class="in-cart">
+                <app-icon name="check" [size]="11" [strokeWidth]="2.6" />
+                {{ productQuantity(product.id) }} au panier
+              </span>
+            }
+          </button>
+        }
+      </div>
+    } @else {
+      <app-empty-state
+        icon="search"
+        title="Aucun produit ne correspond"
+        message="Essayez un autre mot-clé ou affichez toutes les catégories."
+        actionLabel="Réinitialiser"
+        (action)="clearSearch()"
+      />
+    }
+  </section>
+
+  <aside class="ticket-column">
+    <form class="ticket kora-card" (submit)="submit(); $event.preventDefault()" novalidate>
+      <div class="ticket__head">
+        <div>
+          <p class="kora-eyebrow">Panier</p>
+          <h2>Ticket de vente</h2>
+        </div>
+        <span class="ticket__count">{{ lineCount() }} article{{ lineCount() > 1 ? 's' : '' }}</span>
+      </div>
+
+      <div class="field">
+        <label class="kora-label" for="sale-customer">
+          Client
+          <span class="label-hint">{{ balance() > 0 ? 'requis pour un crédit' : 'facultatif' }}</span>
+        </label>
+        <input
+          #customerInput
+          id="sale-customer"
+          type="text"
+          class="kora-input"
+          [class.input-error]="customerError()"
+          [value]="customer()"
+          (input)="setCustomer($event)"
+          placeholder="Nom du client"
+          autocomplete="off"
+          [attr.aria-invalid]="customerError() ? 'true' : null"
+          [attr.aria-describedby]="customerError() ? 'sale-customer-error' : null"
+        />
+        @if (customerError()) {
+          <p class="kora-error-text" id="sale-customer-error">
+            <app-icon name="alert-circle" [size]="14" />
+            {{ customerError() }}
+          </p>
+        }
+      </div>
+
+      <div class="ticket__lines">
+        @for (line of cartDetails(); track line.id) {
+          <div class="cart-line">
+            <div class="cart-line__head">
+              <div class="min-w-0">
+                <p class="cart-line__name">{{ line.name }}</p>
+                <p class="cart-line__unit">
+                  {{ formatXof(line.sellingPrice) }} / {{ line.unit ?? 'unité' }}
+                </p>
+              </div>
+              <button
+                type="button"
+                class="cart-remove"
+                (click)="removeLine(line.id)"
+                [attr.aria-label]="'Retirer ' + line.name + ' du panier'"
+              >
+                <app-icon name="x" [size]="15" />
+              </button>
+            </div>
+            <div class="cart-line__bottom">
+              <div class="stepper" role="group" [attr.aria-label]="'Quantité pour ' + line.name">
+                <button
+                  type="button"
+                  (click)="decrement(line.id)"
+                  [attr.aria-label]="'Diminuer la quantité de ' + line.name"
+                >
+                  <app-icon name="minus" [size]="13" />
+                </button>
+                <span aria-live="polite">{{ line.quantity }}</span>
+                <button
+                  type="button"
+                  [disabled]="line.maxed"
+                  (click)="increment(line)"
+                  [attr.aria-label]="'Augmenter la quantité de ' + line.name"
+                >
+                  <app-icon name="plus" [size]="13" />
+                </button>
+              </div>
+              <span class="cart-line__total kora-num">{{ formatXof(line.lineTotal) }}</span>
+            </div>
+            @if (line.maxed) {
+              <p class="cart-line__max">Stock maximum atteint ({{ line.stockQuantity }} disponibles)</p>
+            }
+          </div>
+        } @empty {
+          <div class="cart-empty">
+            <span class="cart-empty__icon" aria-hidden="true"><app-icon name="cart" [size]="22" /></span>
+            <p class="cart-empty__title">Le panier est vide</p>
+            <p class="cart-empty__text">Sélectionnez un produit dans le catalogue pour commencer.</p>
+          </div>
+        }
+      </div>
+
+      <div class="totals">
+        <div class="totals__row">
+          <span>Total à payer</span>
+          <strong class="kora-num">{{ formatXof(total()) }}</strong>
+        </div>
+        <p class="totals__margin">
+          Marge brute estimée
+          <span class="kora-num">{{ formatXof(estimatedMargin()) }}</span>
+        </p>
+      </div>
+
+      <fieldset class="payment">
+        <legend class="kora-label">Moyen de paiement</legend>
+        <div class="method-grid" role="group" aria-label="Moyen de paiement">
+          @for (option of methods; track option.value) {
+            <button
+              type="button"
+              class="method"
+              [attr.aria-pressed]="method() === option.value"
+              (click)="setMethod(option.value)"
+            >
+              <app-icon [name]="option.icon" [size]="17" />
+              <span>{{ option.label }}</span>
+            </button>
+          }
+        </div>
+      </fieldset>
+
+      <div class="field">
+        <label class="kora-label" for="sale-paid">Montant reçu</label>
+        <div class="amount-field">
+          <input
+            id="sale-paid"
+            type="number"
+            inputmode="numeric"
+            min="0"
+            step="100"
+            [max]="total()"
+            [value]="paid()"
+            (input)="setPaid($event)"
+            [attr.aria-invalid]="exceedsTotal() ? 'true' : null"
+            [attr.aria-describedby]="exceedsTotal() ? 'sale-paid-error' : 'sale-paid-hint'"
+          />
+          <span>FCFA</span>
+        </div>
+        <div class="presets">
+          <button type="button" (click)="setPaidPreset('full')">Total</button>
+          <button type="button" (click)="setPaidPreset('half')">Moitié</button>
+          <button type="button" (click)="setPaidPreset('zero')">Aucun</button>
+        </div>
+        @if (exceedsTotal()) {
+          <p class="kora-error-text" id="sale-paid-error">
+            <app-icon name="alert-circle" [size]="14" />
+            Le montant reçu dépasse le total de {{ formatXof(paid() - total()) }}.
+          </p>
+        } @else {
+          <p class="kora-hint" id="sale-paid-hint">
+            Modifiable pour un paiement partiel. Le solde restera dû.
+          </p>
+        }
+      </div>
+
+      <div class="balance-box" [class.balance-box--due]="balance() > 0">
+        <div class="balance-box__row">
+          <span>Reste à payer</span>
+          <strong class="kora-num">{{ formatXof(balance()) }}</strong>
+        </div>
+        @if (balance() > 0) {
+          <p>Le solde dû n’est pas compté comme un encaissement. Il sera visible dans les transactions.</p>
+        } @else if (total() > 0) {
+          <p>Vente soldée : le montant total sera encaissé.</p>
+        } @else {
+          <p>Ajoutez des produits pour calculer le total.</p>
+        }
+      </div>
+
+      @if (formError()) {
+        <div class="form-alert" role="alert">
+          <app-icon name="alert-circle" [size]="16" />
+          <span>{{ formError() }}</span>
+        </div>
+      }
+
+      <button type="submit" class="kora-btn kora-btn--primary submit-btn" [disabled]="submitting() || !cart().length">
+        @if (submitting()) {
+          Enregistrement…
+        } @else {
+          <app-icon name="check" [size]="16" [strokeWidth]="2.4" />
+          {{ submitLabel() }}
+        }
+      </button>
+
+      <p class="ticket__note">
+        <app-icon name="lock" [size]="13" />
+        Le stock est décrémenté une seule fois à la validation. Aucun paiement Mobile Money réel n’est effectué.
+      </p>
+    </form>
+  </aside>
+</div>
+
+<app-dialog [(open)]="successOpen" eyebrow="Reçu de vente" title="Vente enregistrée" size="sm">
+  @if (successSale(); as sale) {
+    <div class="success">
+      <div class="success__banner">
+        <span class="success__icon" aria-hidden="true"><app-icon name="check" [size]="22" [strokeWidth]="2.6" /></span>
+        <div>
+          <p class="success__title">{{ sale.reference }}</p>
+          <p class="success__text">
+            {{ formatDateShort(sale.createdAt) }} à {{ formatTime(sale.createdAt) }} · stock mis à jour
+          </p>
+        </div>
+        <app-status-badge [status]="sale.status" />
+      </div>
+
+      <dl class="receipt">
+        <div>
+          <dt>Total</dt>
+          <dd class="kora-num">{{ formatXof(sale.totalAmount) }}</dd>
+        </div>
+        <div>
+          <dt>Encaissé</dt>
+          <dd class="kora-num">{{ formatXof(sale.amountPaid) }}</dd>
+        </div>
+        <div>
+          <dt>Solde dû</dt>
+          <dd class="kora-num" [class.receipt__due]="sale.balanceDue > 0">{{ formatXof(sale.balanceDue) }}</dd>
+        </div>
+        <div>
+          <dt>Client</dt>
+          <dd>{{ sale.customerName ?? 'Client comptoir' }}</dd>
+        </div>
+        <div>
+          <dt>Paiement</dt>
+          <dd>{{ paymentSummary(sale) }}</dd>
+        </div>
+      </dl>
+
+      <ul class="receipt-lines">
+        @for (line of sale.lines; track line.productId) {
+          <li>
+            <span>{{ line.quantity }} × {{ line.productNameSnapshot }}</span>
+            <span class="kora-num">{{ formatXof(line.lineTotal) }}</span>
+          </li>
+        }
+      </ul>
+    </div>
+  }
+
+  <div dialog-footer>
+    <button type="button" class="kora-btn kora-btn--outline" (click)="newSale()">Nouvelle vente</button>
+    <button type="button" class="kora-btn kora-btn--primary" (click)="viewSale()">
+      Voir la transaction
+      <app-icon name="arrow-right" [size]="15" />
+    </button>
+  </div>
+</app-dialog>

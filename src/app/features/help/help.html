@@ -1,0 +1,54 @@
+<app-page-header
+  eyebrow="Assistance"
+  title="Centre d’aide"
+  subtitle="Les réponses aux questions essentielles sur les ventes, le stock, les dépenses et les données locales."
+  [crumbs]="[{ label: 'Kora', path: '/tableau-de-bord' }, { label: 'Centre d’aide' }]"
+/>
+
+<div class="help-layout">
+  <section class="kora-card help-card" aria-labelledby="help-title">
+    <div class="help-head">
+      <span class="help-head__icon" aria-hidden="true"><app-icon name="help" [size]="20" /></span>
+      <div>
+        <p class="kora-eyebrow">Guide rapide</p>
+        <h2 id="help-title">Comment fonctionne Kora</h2>
+        <p>Cliquez sur une catégorie puis sur une question pour afficher la réponse.</p>
+      </div>
+    </div>
+
+    <app-lui-accordion [categories]="categories" />
+  </section>
+
+  <aside class="help-aside">
+    <section class="kora-card shortcuts-card" aria-labelledby="shortcuts-title">
+      <h2 id="shortcuts-title">Raccourcis</h2>
+      <nav aria-label="Raccourcis de l’aide">
+        @for (shortcut of shortcuts; track shortcut.path) {
+          <a [routerLink]="shortcut.path" class="shortcut">
+            <span class="shortcut__icon"><app-icon [name]="shortcut.icon" [size]="16" /></span>
+            <span>{{ shortcut.label }}</span>
+            <app-icon name="chevron-right" [size]="13" class="shortcut__chevron" />
+          </a>
+        }
+      </nav>
+    </section>
+
+    <section class="kora-card tip-card" aria-labelledby="tip-title">
+      <span class="tip-card__icon" aria-hidden="true"><app-icon name="sparkle" [size]="18" /></span>
+      <h2 id="tip-title">Bon à savoir</h2>
+      <p>
+        Une vente à crédit n’augmente pas vos encaissements. Le tableau de bord distingue toujours le
+        <strong>chiffre d’affaires facturé</strong>, l’<strong>argent reçu</strong> et le
+        <strong>résultat estimé</strong>.
+      </p>
+    </section>
+
+    <section class="kora-card version-card">
+      <p class="kora-eyebrow">Version</p>
+      <p class="version-card__name">Kora · Édition démo</p>
+      <p class="version-card__text">
+        Prototype front-end Angular. Données fictives, stockage local, aucun service externe.
+      </p>
+    </section>
+  </aside>
+</div>

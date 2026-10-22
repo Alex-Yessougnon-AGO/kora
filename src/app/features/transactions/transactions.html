@@ -1,0 +1,230 @@
+<app-page-header
+  eyebrow="Journal"
+  title="Transactions"
+  subtitle="Retrouvez chaque vente, son encaissement et son solde. Enregistrez un paiement ultérieur sans modifier le total."
+  [crumbs]="[{ label: 'Kora', path: '/tableau-de-bord' }, { label: 'Transactions' }]"
+>
+  <div page-actions>
+    <div class="kora-segmented" role="group" aria-label="Période des transactions">
+      @for (option of periodOptions; track option.key) {
+        <button type="button" [attr.aria-pressed]="period() === option.key" (click)="changePeriod(option.key)">
+          {{ option.short }}
+        </button>
+      }
+    </div>
+    <button type="button" class="kora-btn kora-btn--outline" (click)="exportCsv()">
+      <app-icon name="download" [size]="16" />
+      Exporter
+    </button>
+  </div>
+</app-page-header>
+
+<section class="summary-strip" aria-label="Synthèse de la période">
+  <article>
+    <p class="summary-label">Chiffre d’affaires</p>
+    <p class="summary-value kora-num">{{ formatXof(metrics().revenue) }}</p>
+    <p class="summary-hint">{{ rows().length }} vente{{ rows().length > 1 ? 's' : '' }} sur la période</p>
+  </article>
+  <article>
+    <p class="summary-label">Encaissements</p>
+    <p class="summary-value kora-num">{{ formatXof(metrics().cashIn) }}</p>
+    <p class="summary-hint">Paiements datés dans la période</p>
+  </article>
+  <article>
+    <p class="summary-label">Solde à recevoir</p>
+    <p class="summary-value kora-num" [class.summary-value--due]="metrics().outstanding > 0">
+      {{ formatXof(metrics().outstanding) }}
+    </p>
+    <p class="summary-hint">Créances des ventes de la période</p>
+  </article>
+  <article>
+    <p class="summary-label">Panier moyen</p>
+    <p class="summary-value kora-num">{{ formatXof(averageSale()) }}</p>
+    <p class="summary-hint">Total ÷ nombre de ventes</p>
+  </article>
+</section>
+
+<section class="journal" aria-labelledby="journal-title">
+  <div class="journal__head">
+    <div>
+      <p class="kora-eyebrow">Registre</p>
+      <h2 id="journal-title">Toutes les transactions</h2>
+    </div>
+    <p class="journal__meta">{{ metrics().range.label }}</p>
+  </div>
+
+  <app-lui-data-table
+    [columns]="columns"
+    [rows]="rows()"
+    [filters]="filters"
+    [searchKeys]="['reference', 'customer', 'products']"
+    searchPlaceholder="Référence, client ou produit…"
+    caption="Liste des transactions de la période"
+    emptyMessage="Aucune transaction sur cette période. Modifiez les filtres ou enregistrez une vente."
+    [pageSizeOptions]="[10, 25, 50]"
+    [initialPageSize]="10"
+    (action)="handleAction($event)"
+  />
+</section>
+
+<p class="journal-note">
+  <app-icon name="info" [size]="14" />
+  Une vente partiellement payée conserve son solde dû : seuls les paiements enregistrés comptent dans les
+  encaissements. Le détail permet d’ajouter un règlement.
+</p>
+
+<app-dialog
+  [(open)]="detailOpen"
+  [title]="'Vente ' + (selectedSale()?.reference ?? '')"
+  eyebrow="Détail de la transaction"
+  size="lg"
+>
+  @if (selectedSale(); as sale) {
+    <div class="detail-head">
+      <div class="detail-head__meta">
+        <p>{{ formatDateTime(sale.createdAt) }}</p>
+        <p>{{ sale.customerName ?? 'Client comptoir' }} · {{ paymentSummary(sale) }}</p>
+      </div>
+      <app-status-badge [status]="sale.status" />
+    </div>
+
+    <div class="lines-wrap">
+      <table class="detail-lines">
+        <caption class="sr-only">Lignes de la vente {{ sale.reference }}</caption>
+        <thead>
+          <tr>
+            <th scope="col">Produit</th>
+            <th scope="col" class="text-right">Qté</th>
+            <th scope="col" class="text-right">Prix unitaire</th>
+            <th scope="col" class="text-right">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (line of sale.lines; track line.productId) {
+            <tr>
+              <td>{{ line.productNameSnapshot }}</td>
+              <td class="text-right kora-num">{{ line.quantity }}</td>
+              <td class="text-right kora-num">{{ formatXof(line.unitSellingPrice) }}</td>
+              <td class="text-right kora-num">{{ formatXof(line.lineTotal) }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="detail-grid">
+      <section class="totals-card" aria-label="Totaux de la vente">
+        <div><span>Total de la vente</span><strong class="kora-num">{{ formatXof(sale.totalAmount) }}</strong></div>
+        <div><span>Coût des marchandises</span><span class="kora-num">{{ formatXof(sale.costAmount) }}</span></div>
+        <div><span>Marge brute estimée</span><span class="kora-num">{{ formatXof(sale.totalAmount - sale.costAmount) }}</span></div>
+        <div><span>Encaissé</span><strong class="kora-num">{{ formatXof(sale.amountPaid) }}</strong></div>
+        <div class="totals-card__due">
+          <span>Solde dû</span>
+          <strong class="kora-num">{{ formatXof(sale.balanceDue) }}</strong>
+        </div>
+      </section>
+
+      <section class="payments-card" aria-label="Paiements enregistrés">
+        <h3>Paiements</h3>
+        @if (sale.payments.length) {
+          <ul>
+            @for (payment of sale.payments; track payment.id) {
+              <li>
+                <span class="payment-icon" aria-hidden="true"><app-icon name="banknote" [size]="14" /></span>
+                <div>
+                  <p class="payment-method">{{ methodLabels[payment.method] }}</p>
+                  <p class="payment-date">{{ formatDateTime(payment.createdAt) }}</p>
+                </div>
+                <strong class="kora-num">{{ formatXof(payment.amount) }}</strong>
+              </li>
+            }
+          </ul>
+        } @else {
+          <p class="payments-empty">Aucun paiement n’a encore été enregistré.</p>
+        }
+      </section>
+    </div>
+
+    @if (sale.balanceDue > 0) {
+      <section class="pay-form" aria-labelledby="pay-form-title">
+        <div class="pay-form__head">
+          <div>
+            <h3 id="pay-form-title">Enregistrer un paiement</h3>
+            <p>Solde restant : <strong class="kora-num">{{ formatXof(sale.balanceDue) }}</strong></p>
+          </div>
+          <button type="button" class="kora-btn kora-btn--ghost kora-btn--sm" (click)="setDefaultAmount()">
+            Solde total
+          </button>
+        </div>
+
+        <form (submit)="recordPayment(); $event.preventDefault()" novalidate>
+          <div class="pay-grid">
+            <div class="field">
+              <label class="kora-label" for="t-amount">Montant reçu (FCFA)</label>
+              <input
+                id="t-amount"
+                type="number"
+                min="1"
+                step="100"
+                [max]="sale.balanceDue"
+                class="kora-input"
+                name="paymentAmount"
+                [ngModel]="paymentAmount()"
+                (ngModelChange)="paymentAmount.set($event)"
+                [attr.aria-invalid]="paymentError() ? 'true' : null"
+                [attr.aria-describedby]="paymentError() ? 't-amount-error' : null"
+              />
+              @if (paymentError()) {
+                <p class="kora-error-text" id="t-amount-error">
+                  <app-icon name="alert-circle" [size]="14" />{{ paymentError() }}
+                </p>
+              }
+            </div>
+
+            <div class="field">
+              <label class="kora-label" for="t-note">Note (facultatif)</label>
+              <input
+                id="t-note"
+                class="kora-input"
+                name="paymentNote"
+                placeholder="Référence Mobile Money…"
+                [ngModel]="paymentNote()"
+                (ngModelChange)="paymentNote.set($event)"
+              />
+            </div>
+          </div>
+
+          <fieldset class="pay-methods">
+            <legend class="kora-label">Moyen de paiement</legend>
+            <div class="pay-methods__grid" role="group" aria-label="Moyen de paiement">
+              @for (option of paymentMethods; track option.value) {
+                <button
+                  type="button"
+                  class="pay-method"
+                  [attr.aria-pressed]="paymentMethod() === option.value"
+                  (click)="setPaymentMethod(option.value)"
+                >
+                  <app-icon [name]="option.icon" [size]="15" />
+                  {{ option.label }}
+                </button>
+              }
+            </div>
+          </fieldset>
+
+          <button type="submit" class="kora-btn kora-btn--primary" [disabled]="paying()">
+            {{ paying() ? 'Enregistrement…' : 'Enregistrer le paiement' }}
+          </button>
+        </form>
+      </section>
+    } @else {
+      <div class="paid-note">
+        <app-icon name="check" [size]="15" />
+        Cette vente est entièrement payée. Aucun solde ne reste dû.
+      </div>
+    }
+  }
+
+  <div dialog-footer>
+    <button type="button" class="kora-btn kora-btn--outline" (click)="closeDetail()">Fermer</button>
+  </div>
+</app-dialog>

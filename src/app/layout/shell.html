@@ -1,0 +1,156 @@
+<a class="skip-link" href="#contenu">Aller au contenu principal</a>
+
+<div class="app-shell">
+  @if (drawerOpen()) {
+    <button
+      type="button"
+      class="drawer-backdrop"
+      (click)="closeDrawer()"
+      aria-label="Fermer le menu de navigation"
+      tabindex="-1"
+    ></button>
+  }
+
+  <aside class="sidebar" [class.sidebar--open]="drawerOpen()" aria-label="Navigation principale">
+    <div class="sidebar__brand">
+      <a routerLink="/tableau-de-bord" class="brand" (click)="closeDrawer()">
+        <span class="brand__mark" aria-hidden="true">K</span>
+        <span class="brand__text">
+          <span class="brand__name">Kora</span>
+          <span class="brand__tagline">Gestion de boutique</span>
+        </span>
+      </a>
+      <button type="button" class="sidebar__close" (click)="closeDrawer()" aria-label="Fermer le menu">
+        <app-icon name="x" [size]="18" />
+      </button>
+    </div>
+
+    <div class="shop-chip">
+      <div class="shop-chip__avatar" aria-hidden="true">{{ initials() }}</div>
+      <div class="min-w-0">
+        <p class="shop-chip__name">{{ shop().name }}</p>
+        <p class="shop-chip__city">{{ shop().city || 'Commerce de proximité' }}</p>
+      </div>
+      <span class="shop-chip__dot" title="Données locales"></span>
+    </div>
+
+    <nav class="sidebar__nav">
+      @for (group of navItems; track group.group) {
+        <div class="nav-group">
+          <p class="nav-group__label">{{ group.group }}</p>
+          @for (item of group.items; track item.path) {
+            <a
+              class="nav-link"
+              [routerLink]="item.path"
+              routerLinkActive="nav-link--active"
+              [routerLinkActiveOptions]="{ exact: !!item.exact }"
+              (click)="closeDrawer()"
+            >
+              <app-icon [name]="item.icon" [size]="18" />
+              <span class="flex-1">{{ item.label }}</span>
+              @if (item.badge === 'lowStock' && lowStockCount() > 0) {
+                <span class="nav-badge" [attr.aria-label]="lowStockCount() + ' produits à surveiller'">
+                  {{ lowStockCount() }}
+                </span>
+              }
+            </a>
+          }
+        </div>
+      }
+    </nav>
+
+    <div class="sidebar__footer">
+      <a routerLink="/parametres" fragment="donnees" class="storage-card" (click)="closeDrawer()">
+        <span class="storage-card__icon" aria-hidden="true"><app-icon name="database" [size]="16" /></span>
+        <span>
+          <span class="storage-card__title">Données locales</span>
+          <span class="storage-card__text">Enregistrées sur cet appareil</span>
+        </span>
+      </a>
+      <a routerLink="/parametres" class="sidebar__settings" (click)="closeDrawer()">
+        <app-icon name="settings" [size]="17" />
+        Paramètres
+      </a>
+      <p class="sidebar__version">Kora · Édition démo · v1.0</p>
+    </div>
+  </aside>
+
+  <div class="app-main">
+    <header class="topbar">
+      <div class="topbar__left">
+        <button
+          type="button"
+          class="topbar__menu"
+          (click)="openDrawer()"
+          aria-label="Ouvrir le menu de navigation"
+          [attr.aria-expanded]="drawerOpen()"
+        >
+          <app-icon name="menu" [size]="20" />
+        </button>
+        <div class="topbar__titles">
+          <p class="topbar__title">{{ pageTitle() }}</p>
+          <p class="topbar__date">{{ today }}</p>
+        </div>
+      </div>
+
+      <div class="topbar__actions">
+        <a routerLink="/vente" class="kora-btn kora-btn--primary topbar__sale" aria-label="Nouvelle vente">
+          <app-icon name="plus" [size]="16" />
+          <span>Nouvelle vente</span>
+        </a>
+        <app-account-menu
+          [name]="shop().owner"
+          [initials]="initials()"
+          role="Gérante"
+          [shopName]="shop().name"
+          (action)="handleAccountAction($event)"
+        />
+      </div>
+    </header>
+
+    <main id="contenu" class="main-content" tabindex="-1">
+      <div class="main-content__inner">
+        <router-outlet />
+      </div>
+    </main>
+  </div>
+</div>
+
+<nav class="mobile-nav" aria-label="Navigation mobile">
+  <a routerLink="/tableau-de-bord" routerLinkActive="mobile-nav__item--active" class="mobile-nav__item">
+    <app-icon name="dashboard" [size]="20" />
+    <span>Accueil</span>
+  </a>
+  <a routerLink="/vente" routerLinkActive="mobile-nav__item--active" class="mobile-nav__item">
+    <app-icon name="cart" [size]="20" />
+    <span>Vente</span>
+  </a>
+  <a routerLink="/produits" routerLinkActive="mobile-nav__item--active" class="mobile-nav__item">
+    <span class="mobile-nav__icon-wrap">
+      <app-icon name="box" [size]="20" />
+      @if (lowStockCount() > 0) {
+        <span class="mobile-nav__dot" [attr.aria-label]="lowStockCount() + ' alertes de stock'"></span>
+      }
+    </span>
+    <span>Stock</span>
+  </a>
+  <a routerLink="/transactions" routerLinkActive="mobile-nav__item--active" class="mobile-nav__item">
+    <app-icon name="receipt" [size]="20" />
+    <span>Journal</span>
+  </a>
+  <button type="button" class="mobile-nav__item" (click)="openDrawer()">
+    <app-icon name="menu" [size]="20" />
+    <span>Menu</span>
+  </button>
+</nav>
+
+<app-confirm-dialog
+  [(open)]="resetOpen"
+  eyebrow="Données de démonstration"
+  title="Recharger la démo ?"
+  message="Toutes les ventes, dépenses, produits et paiements enregistrés sur cet appareil seront remplacés par le jeu de démonstration initial."
+  detail="Cette action est irréversible. Exportez vos ventes et dépenses au format CSV depuis les paramètres si vous souhaitez conserver une trace."
+  confirmLabel="Recharger la démo"
+  tone="danger"
+  (confirmed)="confirmReset()"
+/>

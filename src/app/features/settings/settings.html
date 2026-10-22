@@ -1,0 +1,174 @@
+<app-page-header
+  eyebrow="Configuration"
+  title="Paramètres"
+  subtitle="Identité de la boutique, sauvegarde locale et limites de la démonstration."
+  [crumbs]="[{ label: 'Kora', path: '/tableau-de-bord' }, { label: 'Paramètres' }]"
+/>
+
+@if (notice(); as noticeMessage) {
+  <div class="notice-banner" role="status">
+    <app-icon name="alert-circle" [size]="17" />
+    <div>
+      <strong>Stockage local</strong>
+      <p>{{ noticeMessage.message }}</p>
+    </div>
+  </div>
+}
+
+<div class="settings-layout">
+  <div class="settings-main">
+    <section class="kora-card section-card" aria-labelledby="shop-title">
+      <div class="section-head">
+        <div>
+          <p class="kora-eyebrow">Identité</p>
+          <h2 id="shop-title">Ma boutique</h2>
+        </div>
+        <span class="section-icon"><app-icon name="store" [size]="18" /></span>
+      </div>
+
+      <form (submit)="saveShop(); $event.preventDefault()" novalidate>
+        <div class="form-grid">
+          <div class="field">
+            <label class="kora-label" for="s-name">Nom de la boutique</label>
+            <input
+              id="s-name"
+              class="kora-input"
+              [(ngModel)]="shopDraft.name"
+              name="shopName"
+              [attr.aria-invalid]="nameError() ? 'true' : null"
+              [attr.aria-describedby]="nameError() ? 's-name-error' : null"
+            />
+            @if (nameError()) {
+              <p class="kora-error-text" id="s-name-error"><app-icon name="alert-circle" [size]="14" />{{ nameError() }}</p>
+            }
+          </div>
+
+          <div class="field">
+            <label class="kora-label" for="s-owner">Responsable</label>
+            <input id="s-owner" class="kora-input" [(ngModel)]="shopDraft.owner" name="owner" />
+          </div>
+
+          <div class="field">
+            <label class="kora-label" for="s-city">Ville / quartier</label>
+            <input id="s-city" class="kora-input" [(ngModel)]="shopDraft.city" name="city" />
+          </div>
+
+          <div class="field">
+            <label class="kora-label" for="s-currency">Devise</label>
+            <input id="s-currency" class="kora-input" value="FCFA (XOF)" disabled />
+            <p class="kora-hint">Les montants sont des entiers en francs CFA.</p>
+          </div>
+        </div>
+
+        <button type="submit" class="kora-btn kora-btn--primary">Enregistrer les informations</button>
+      </form>
+    </section>
+
+    <section class="kora-card section-card" id="donnees" aria-labelledby="data-title">
+      <div class="section-head">
+        <div>
+          <p class="kora-eyebrow">Stockage</p>
+          <h2 id="data-title">Données locales</h2>
+        </div>
+        <span class="section-icon section-icon--amber"><app-icon name="database" [size]="18" /></span>
+      </div>
+
+      <div class="storage-status">
+        <span class="storage-status__dot" aria-hidden="true"></span>
+        <div>
+          <p class="storage-status__title">Enregistrées sur cet appareil</p>
+          <p class="storage-status__text">{{ lastSavedLabel() }}</p>
+        </div>
+        <span class="storage-status__badge">Local</span>
+      </div>
+
+      <div class="data-counts">
+        <div><span>Produits</span><strong class="kora-num">{{ counts().products }}</strong></div>
+        <div><span>Ventes</span><strong class="kora-num">{{ counts().sales }}</strong></div>
+        <div><span>Dépenses</span><strong class="kora-num">{{ counts().expenses }}</strong></div>
+        <div><span>Mouvements</span><strong class="kora-num">{{ counts().movements }}</strong></div>
+      </div>
+
+      <div class="export-block">
+        <div>
+          <h3>Exporter une copie</h3>
+          <p>Les fichiers sont générés localement, sans envoi vers un serveur.</p>
+        </div>
+        <div class="export-actions">
+          <button type="button" class="kora-btn kora-btn--outline kora-btn--sm" (click)="exportSales()">
+            <app-icon name="download" [size]="14" />
+            Ventes CSV
+          </button>
+          <button type="button" class="kora-btn kora-btn--outline kora-btn--sm" (click)="exportExpenses()">
+            <app-icon name="download" [size]="14" />
+            Dépenses CSV
+          </button>
+          <button type="button" class="kora-btn kora-btn--outline kora-btn--sm" (click)="exportBackup()">
+            <app-icon name="database" [size]="14" />
+            Sauvegarde JSON
+          </button>
+        </div>
+      </div>
+
+      <div class="danger-zone">
+        <div>
+          <h3>Réinitialiser la démonstration</h3>
+          <p>Remplace toutes les données locales par le jeu de démonstration initial. Action irréversible.</p>
+        </div>
+        <button type="button" class="kora-btn kora-btn--danger kora-btn--sm" (click)="askReset()">
+          <app-icon name="refresh" [size]="14" />
+          Réinitialiser
+        </button>
+      </div>
+    </section>
+  </div>
+
+  <aside class="settings-aside">
+    <section class="kora-card summary-card" aria-labelledby="summary-title">
+      <h2 id="summary-title">En un coup d’œil</h2>
+      <dl>
+        <div>
+          <dt>Chiffre d’affaires total</dt>
+          <dd class="kora-num">{{ formatXof(revenueAllTime()) }}</dd>
+        </div>
+        <div>
+          <dt>Solde à recevoir</dt>
+          <dd class="kora-num" [class.summary-due]="outstanding() > 0">{{ formatXof(outstanding()) }}</dd>
+        </div>
+        <div>
+          <dt>Ventes enregistrées</dt>
+          <dd class="kora-num">{{ data().sales.length }}</dd>
+        </div>
+        <div>
+          <dt>Références au catalogue</dt>
+          <dd class="kora-num">{{ data().products.length }}</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="kora-card limits-card" aria-labelledby="limits-title">
+      <h2 id="limits-title">Limites de la démo</h2>
+      <ul>
+        <li><app-icon name="info" [size]="14" /> Prototype front-end, sans backend ni synchronisation multi-appareils.</li>
+        <li><app-icon name="info" [size]="14" /> Les paiements Mobile Money sont saisis manuellement, jamais exécutés.</li>
+        <li><app-icon name="info" [size]="14" /> Données fictives, sans valeur comptable ni fiscale.</li>
+        <li><app-icon name="info" [size]="14" /> Le stockage local n’est pas une sauvegarde cloud sécurisée.</li>
+      </ul>
+      <a routerLink="/aide" class="kora-link limits-link">
+        Consulter le centre d’aide
+        <app-icon name="arrow-right" [size]="14" />
+      </a>
+    </section>
+  </aside>
+</div>
+
+<app-confirm-dialog
+  [(open)]="resetOpen"
+  eyebrow="Zone sensible"
+  title="Réinitialiser toutes les données ?"
+  message="Les ventes, dépenses, produits et paiements enregistrés sur cet appareil seront remplacés par le jeu de démonstration."
+  detail="Pensez à exporter vos ventes et dépenses en CSV avant de continuer. Cette action est définitive."
+  confirmLabel="Réinitialiser"
+  tone="danger"
+  (confirmed)="confirmReset()"
+/>

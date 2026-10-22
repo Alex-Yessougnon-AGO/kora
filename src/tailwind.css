@@ -1,0 +1,92 @@
+@import 'tailwindcss';
+
+/* Tailwind theme mapping — permet aux composants LibraryUI (Angular × Tailwind)
+   d'hériter automatiquement de la palette Kora. */
+@theme {
+  --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+
+  --color-ivory: #f7f7f2;
+  --color-surface: #ffffff;
+  --color-forest: #133d32;
+  --color-action: #16794b;
+  --color-mint: #e5f3e8;
+  --color-amber: #e9b96e;
+  --color-ink: #202724;
+  --color-muted: #68716c;
+  --color-line: #e3e7e2;
+
+  /* Neutres chauds */
+  --color-gray-50: #f7f7f2;
+  --color-gray-100: #f0f1eb;
+  --color-gray-200: #e3e7e2;
+  --color-gray-300: #cbd2cc;
+  --color-gray-400: #9aa39d;
+  --color-gray-500: #68716c;
+  --color-gray-600: #4f5953;
+  --color-gray-700: #3a423e;
+  --color-gray-800: #2a312d;
+  --color-gray-900: #202724;
+
+  --color-slate-50: #f7f7f2;
+  --color-slate-100: #eef1eb;
+  --color-slate-200: #e3e7e2;
+  --color-slate-300: #cbd2cc;
+  --color-slate-400: #9aa39d;
+  --color-slate-500: #68716c;
+  --color-slate-600: #4f5953;
+  --color-slate-700: #3a423e;
+  --color-slate-800: #2a312d;
+  --color-slate-900: #202724;
+
+  /* Accent principal (vert action) */
+  --color-indigo-50: #e5f3e8;
+  --color-indigo-100: #d3ead9;
+  --color-indigo-200: #b3dcc0;
+  --color-indigo-300: #86c8a0;
+  --color-indigo-400: #4aa978;
+  --color-indigo-500: #1f8a58;
+  --color-indigo-600: #16794b;
+  --color-indigo-700: #12603c;
+  --color-indigo-800: #124d33;
+  --color-indigo-900: #133d32;
+
+  /* Succès / menthe */
+  --color-emerald-50: #e5f3e8;
+  --color-emerald-100: #d3ead9;
+  --color-emerald-500: #1f8a58;
+  --color-emerald-600: #16794b;
+  --color-emerald-700: #12603c;
+
+  /* Avertissement / ambre */
+  --color-amber-50: #fbf3e4;
+  --color-amber-100: #f6e6c8;
+  --color-amber-200: #efd3a0;
+  --color-amber-500: #a9762a;
+  --color-amber-600: #8c601f;
+  --color-amber-700: #6f4b18;
+
+  /* Erreur / terre cuite */
+  --color-red-50: #fbedE9;
+  --color-red-100: #f6dcd5;
+  --color-red-200: #eec2b7;
+  --color-red-500: #b4472f;
+  --color-red-600: #9c3a25;
+  --color-red-700: #7f2e1d;
+
+  /* Info / bleu ardoise */
+  --color-blue-50: #eaf1f4;
+  --color-blue-100: #d9e7ec;
+  --color-blue-500: #2f6f8f;
+  --color-blue-600: #275d78;
+
+  /* Badge premium du menu compte */
+  --color-fuchsia-100: #f6e6c8;
+  --color-fuchsia-600: #8c601f;
+
+  --color-violet-600: #16794b;
+
+  --radius-xl: 0.875rem;
+  --radius-2xl: 1.125rem;
+  --radius-3xl: 1.5rem;
+}

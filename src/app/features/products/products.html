@@ -1,0 +1,432 @@
+<app-page-header
+  eyebrow="Catalogue"
+  title="Produits & stock"
+  subtitle="Vos références, prix et niveaux de stock au même endroit. Chaque mouvement est tracé."
+  [crumbs]="[{ label: 'Kora', path: '/tableau-de-bord' }, { label: 'Produits & stock' }]"
+>
+  <div page-actions>
+    <button type="button" class="kora-btn kora-btn--primary" (click)="openCreate()">
+      <app-icon name="plus" [size]="16" />
+      Nouveau produit
+    </button>
+  </div>
+</app-page-header>
+
+<section class="stat-strip" aria-label="Synthèse du stock">
+  <article class="stat-mini">
+    <span class="stat-mini__icon"><app-icon name="box" [size]="17" /></span>
+    <div>
+      <p class="stat-mini__label">Références</p>
+      <p class="stat-mini__value kora-num">{{ products().length }}</p>
+      <p class="stat-mini__hint">{{ totalUnits() }} unités en stock</p>
+    </div>
+  </article>
+  <article class="stat-mini">
+    <span class="stat-mini__icon"><app-icon name="layers" [size]="17" /></span>
+    <div>
+      <p class="stat-mini__label">Valeur d’achat du stock</p>
+      <p class="stat-mini__value kora-num">{{ formatXof(stockValue()) }}</p>
+      <p class="stat-mini__hint">Au prix d’achat, hors marge</p>
+    </div>
+  </article>
+  <article class="stat-mini">
+    <span class="stat-mini__icon stat-mini__icon--amber"><app-icon name="alert-triangle" [size]="17" /></span>
+    <div>
+      <p class="stat-mini__label">Sous le seuil</p>
+      <p class="stat-mini__value kora-num" [class.stat-mini__value--amber]="lowStockCount() > 0">{{ lowStockCount() }}</p>
+      <p class="stat-mini__hint">À réapprovisionner bientôt</p>
+    </div>
+  </article>
+  <article class="stat-mini">
+    <span class="stat-mini__icon stat-mini__icon--danger"><app-icon name="alert-circle" [size]="17" /></span>
+    <div>
+      <p class="stat-mini__label">Ruptures</p>
+      <p class="stat-mini__value kora-num" [class.stat-mini__value--danger]="outOfStockCount() > 0">{{ outOfStockCount() }}</p>
+      <p class="stat-mini__hint">Stock à zéro</p>
+    </div>
+  </article>
+</section>
+
+<section class="filters kora-card" aria-label="Rechercher et filtrer les produits">
+  <div class="filter-search">
+    <app-icon name="search" [size]="16" class="filter-search__icon" />
+    <label for="product-search" class="sr-only">Rechercher un produit</label>
+    <input
+      id="product-search"
+      type="search"
+      [value]="search()"
+      (input)="setSearch($event)"
+      placeholder="Rechercher un nom, une référence…"
+    />
+  </div>
+
+  <label for="product-category" class="sr-only">Filtrer par catégorie</label>
+  <select id="product-category" class="kora-select filter-select" [value]="category()" (change)="category.set($any($event.target).value)">
+    @for (option of categoryOptions(); track option) {
+      <option [value]="option" [selected]="option === category()">{{ option }}</option>
+    }
+  </select>
+
+  <label for="product-stock" class="sr-only">Filtrer par niveau de stock</label>
+  <select id="product-stock" class="kora-select filter-select" [value]="stockFilter()" (change)="setStockFilter($any($event.target).value)">
+    <option value="all" [selected]="stockFilter() === 'all'">Tous les stocks</option>
+    <option value="ok" [selected]="stockFilter() === 'ok'">Disponibles</option>
+    <option value="low" [selected]="stockFilter() === 'low'">Stock faible</option>
+    <option value="out" [selected]="stockFilter() === 'out'">En rupture</option>
+  </select>
+
+  <span class="filter-count">{{ filteredProducts().length }} résultat{{ filteredProducts().length > 1 ? 's' : '' }}</span>
+
+  @if (search() || category() !== 'Toutes' || stockFilter() !== 'all') {
+    <button type="button" class="kora-btn kora-btn--ghost kora-btn--sm" (click)="clearFilters()">
+      <app-icon name="x" [size]="14" />
+      Effacer
+    </button>
+  }
+</section>
+
+@if (filteredProducts().length) {
+  <section class="table-card kora-card" aria-labelledby="products-table-title">
+    <div class="table-card__head">
+      <h2 id="products-table-title" class="sr-only">Liste des produits</h2>
+      <p class="table-card__hint">Les prix de vente passés restent figés dans l’historique des transactions.</p>
+    </div>
+
+    <div class="table-wrap">
+      <table class="kora-table products-table">
+        <thead>
+          <tr>
+            <th scope="col">Produit</th>
+            <th scope="col" class="col-category">Catégorie</th>
+            <th scope="col" class="text-right col-purchase">Achat</th>
+            <th scope="col" class="text-right">Vente</th>
+            <th scope="col">Stock</th>
+            <th scope="col">Statut</th>
+            <th scope="col" class="text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (product of filteredProducts(); track product.id) {
+            <tr>
+              <td>
+                <div class="product-cell">
+                  <span class="product-avatar" aria-hidden="true">{{ product.name.charAt(0) }}</span>
+                  <div class="min-w-0">
+                    <p class="product-name">{{ product.name }}</p>
+                    <p class="product-sku">{{ product.sku ?? 'Sans référence' }} · {{ product.unit ?? 'unité' }}</p>
+                  </div>
+                </div>
+              </td>
+              <td class="col-category"><span class="category-chip">{{ product.category ?? 'Divers' }}</span></td>
+              <td class="text-right kora-num col-purchase">{{ formatXof(product.purchasePrice) }}</td>
+              <td class="text-right">
+                <span class="price-cell kora-num">{{ formatXof(product.sellingPrice) }}</span>
+                <span class="margin-cell">marge {{ margin(product) }} %</span>
+              </td>
+              <td>
+                <div class="stock-cell">
+                  <span class="stock-cell__qty kora-num">{{ product.stockQuantity }} {{ product.unit ?? 'u.' }}</span>
+                  <div class="bar" aria-hidden="true">
+                    <span [class]="'bar--' + stockTone(product)" [style.width.%]="stockBar(product)"></span>
+                  </div>
+                  <span class="stock-cell__threshold">seuil {{ product.lowStockThreshold }}</span>
+                </div>
+              </td>
+              <td>
+                <span [class]="'stock-badge stock-badge--' + stockTone(product)">
+                  <app-icon
+                    [name]="stockTone(product) === 'ok' ? 'check' : stockTone(product) === 'low' ? 'alert-triangle' : 'alert-circle'"
+                    [size]="11"
+                    [strokeWidth]="2.2"
+                  />
+                  {{ stockText(product) }}
+                </span>
+              </td>
+              <td>
+                <div class="row-actions">
+                  <button type="button" class="row-btn" (click)="openEdit(product)" title="Modifier" [attr.aria-label]="'Modifier ' + product.name">
+                    <app-icon name="edit" [size]="15" />
+                  </button>
+                  <button type="button" class="row-btn" (click)="openRestock(product)" title="Réapprovisionner" [attr.aria-label]="'Réapprovisionner ' + product.name">
+                    <app-icon name="plus" [size]="15" />
+                  </button>
+                  <button type="button" class="row-btn" (click)="openHistory(product)" title="Historique du stock" [attr.aria-label]="'Historique du stock de ' + product.name">
+                    <app-icon name="clock" [size]="15" />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <ul class="mobile-products" aria-label="Produits">
+      @for (product of filteredProducts(); track product.id) {
+        <li class="mobile-product">
+          <div class="mobile-product__head">
+            <div class="product-cell">
+              <span class="product-avatar" aria-hidden="true">{{ product.name.charAt(0) }}</span>
+              <div class="min-w-0">
+                <p class="product-name">{{ product.name }}</p>
+                <p class="product-sku">{{ product.category ?? 'Divers' }} · {{ product.sku ?? 'sans réf.' }}</p>
+              </div>
+            </div>
+            <span [class]="'stock-badge stock-badge--' + stockTone(product)">{{ stockText(product) }}</span>
+          </div>
+
+          <div class="mobile-product__prices">
+            <div><span>Achat</span><strong class="kora-num">{{ formatXof(product.purchasePrice) }}</strong></div>
+            <div><span>Vente</span><strong class="kora-num">{{ formatXof(product.sellingPrice) }}</strong></div>
+            <div><span>Marge</span><strong class="kora-num">{{ margin(product) }} %</strong></div>
+          </div>
+
+          <div class="mobile-product__stock">
+            <span class="stock-cell__qty kora-num">{{ product.stockQuantity }} {{ product.unit ?? 'u.' }} en stock</span>
+            <div class="bar" aria-hidden="true">
+              <span [class]="'bar--' + stockTone(product)" [style.width.%]="stockBar(product)"></span>
+            </div>
+            <span class="stock-cell__threshold">Seuil d’alerte : {{ product.lowStockThreshold }}</span>
+          </div>
+
+          <div class="mobile-product__actions">
+            <button type="button" class="kora-btn kora-btn--outline kora-btn--sm" (click)="openEdit(product)">
+              <app-icon name="edit" [size]="14" /> Modifier
+            </button>
+            <button type="button" class="kora-btn kora-btn--outline kora-btn--sm" (click)="openRestock(product)">
+              <app-icon name="plus" [size]="14" /> Réappro.
+            </button>
+            <button type="button" class="kora-btn kora-btn--ghost kora-btn--sm" (click)="openHistory(product)">
+              <app-icon name="clock" [size]="14" /> Historique
+            </button>
+          </div>
+        </li>
+      }
+    </ul>
+  </section>
+} @else {
+  <section class="kora-card">
+    <app-empty-state
+      icon="box"
+      title="Aucun produit trouvé"
+      message="Modifiez vos filtres ou créez une nouvelle référence pour commencer à vendre."
+      actionLabel="Nouveau produit"
+      (action)="openCreate()"
+    />
+  </section>
+}
+
+<!-- Création / édition -->
+<app-dialog
+  [(open)]="productOpen"
+  [title]="canCreate() ? 'Nouveau produit' : 'Modifier le produit'"
+  eyebrow="Catalogue"
+  size="lg"
+>
+  <form id="product-form" class="form-grid" (submit)="saveProduct(); $event.preventDefault()" novalidate>
+    <div class="field span-2">
+      <label class="kora-label" for="p-name">Nom du produit <span class="req">*</span></label>
+      <input
+        id="p-name"
+        class="kora-input"
+        [(ngModel)]="draft.name"
+        name="name"
+        placeholder="Ex. Pagne wax 6 yards"
+        [attr.aria-invalid]="errors().name ? 'true' : null"
+        [attr.aria-describedby]="errors().name ? 'p-name-error' : null"
+      />
+      @if (errors().name) {
+        <p class="kora-error-text" id="p-name-error"><app-icon name="alert-circle" [size]="14" />{{ errors().name }}</p>
+      }
+    </div>
+
+    <div class="field">
+      <label class="kora-label" for="p-sku">Référence</label>
+      <input id="p-sku" class="kora-input" [(ngModel)]="draft.sku" name="sku" placeholder="KOR-017" />
+    </div>
+
+    <div class="field">
+      <label class="kora-label" for="p-category">Catégorie</label>
+      <input
+        id="p-category"
+        class="kora-input"
+        list="category-suggestions"
+        [(ngModel)]="draft.category"
+        name="category"
+        placeholder="Tissus, Accessoires…"
+      />
+      <datalist id="category-suggestions">
+        @for (category of categorySuggestions; track category) {
+          <option [value]="category"></option>
+        }
+      </datalist>
+    </div>
+
+    <div class="field">
+      <label class="kora-label" for="p-purchase">Prix d’achat (FCFA)</label>
+      <input
+        id="p-purchase"
+        type="number"
+        min="0"
+        step="100"
+        class="kora-input"
+        [(ngModel)]="draft.purchasePrice"
+        name="purchasePrice"
+        [attr.aria-invalid]="errors().purchasePrice ? 'true' : null"
+        [attr.aria-describedby]="errors().purchasePrice ? 'p-purchase-error' : null"
+      />
+      @if (errors().purchasePrice) {
+        <p class="kora-error-text" id="p-purchase-error"><app-icon name="alert-circle" [size]="14" />{{ errors().purchasePrice }}</p>
+      }
+    </div>
+
+    <div class="field">
+      <label class="kora-label" for="p-selling">Prix de vente (FCFA)</label>
+      <input
+        id="p-selling"
+        type="number"
+        min="0"
+        step="100"
+        class="kora-input"
+        [(ngModel)]="draft.sellingPrice"
+        name="sellingPrice"
+        [attr.aria-invalid]="errors().sellingPrice ? 'true' : null"
+        [attr.aria-describedby]="errors().sellingPrice ? 'p-selling-error' : null"
+      />
+      @if (errors().sellingPrice) {
+        <p class="kora-error-text" id="p-selling-error"><app-icon name="alert-circle" [size]="14" />{{ errors().sellingPrice }}</p>
+      }
+    </div>
+
+    <div class="field">
+      <label class="kora-label" for="p-stock">Quantité en stock</label>
+      <input
+        id="p-stock"
+        type="number"
+        min="0"
+        step="1"
+        class="kora-input"
+        [(ngModel)]="draft.stockQuantity"
+        name="stockQuantity"
+        [attr.aria-invalid]="errors().stockQuantity ? 'true' : null"
+        [attr.aria-describedby]="errors().stockQuantity ? 'p-stock-error' : null"
+      />
+      @if (errors().stockQuantity) {
+        <p class="kora-error-text" id="p-stock-error"><app-icon name="alert-circle" [size]="14" />{{ errors().stockQuantity }}</p>
+      }
+    </div>
+
+    <div class="field">
+      <label class="kora-label" for="p-threshold">Seuil d’alerte</label>
+      <input
+        id="p-threshold"
+        type="number"
+        min="0"
+        step="1"
+        class="kora-input"
+        [(ngModel)]="draft.lowStockThreshold"
+        name="lowStockThreshold"
+        [attr.aria-invalid]="errors().lowStockThreshold ? 'true' : null"
+        [attr.aria-describedby]="errors().lowStockThreshold ? 'p-threshold-error' : null"
+      />
+      @if (errors().lowStockThreshold) {
+        <p class="kora-error-text" id="p-threshold-error"><app-icon name="alert-circle" [size]="14" />{{ errors().lowStockThreshold }}</p>
+      }
+    </div>
+
+    <div class="field">
+      <label class="kora-label" for="p-unit">Unité</label>
+      <input id="p-unit" class="kora-input" [(ngModel)]="draft.unit" name="unit" placeholder="pièce, paire, sac…" />
+    </div>
+
+    <p class="form-note span-2">
+      <app-icon name="info" [size]="14" />
+      Une modification manuelle de la quantité crée un mouvement de correction dans l’historique du stock.
+    </p>
+  </form>
+
+  <div dialog-footer>
+    <button type="button" class="kora-btn kora-btn--outline" (click)="productOpen.set(false)">Annuler</button>
+    <button type="submit" form="product-form" class="kora-btn kora-btn--primary">
+      {{ canCreate() ? 'Créer le produit' : 'Enregistrer' }}
+    </button>
+  </div>
+</app-dialog>
+
+<!-- Réapprovisionnement -->
+<app-dialog [(open)]="restockOpen" title="Réapprovisionner" eyebrow="Mouvement de stock" size="sm">
+  @if (restockTarget(); as product) {
+    <div class="restock-head">
+      <span class="product-avatar" aria-hidden="true">{{ product.name.charAt(0) }}</span>
+      <div>
+        <p class="product-name">{{ product.name }}</p>
+        <p class="product-sku">Stock actuel : {{ product.stockQuantity }} {{ product.unit ?? 'unité(s)' }}</p>
+      </div>
+    </div>
+
+    <form id="restock-form" (submit)="confirmRestock(); $event.preventDefault()" novalidate>
+      <div class="field">
+        <label class="kora-label" for="r-qty">Quantité à ajouter</label>
+        <input
+          id="r-qty"
+          type="number"
+          min="1"
+          step="1"
+          class="kora-input"
+          [(ngModel)]="restockQuantity"
+          name="restockQuantity"
+          placeholder="Ex. 12"
+          [attr.aria-invalid]="restockError() ? 'true' : null"
+          [attr.aria-describedby]="restockError() ? 'r-qty-error' : null"
+        />
+        @if (restockError()) {
+          <p class="kora-error-text" id="r-qty-error"><app-icon name="alert-circle" [size]="14" />{{ restockError() }}</p>
+        }
+      </div>
+      <div class="field">
+        <label class="kora-label" for="r-note">Note (facultatif)</label>
+        <input id="r-note" class="kora-input" [(ngModel)]="restockNote" name="restockNote" placeholder="Fournisseur, lot…" />
+      </div>
+      <p class="form-note">
+        <app-icon name="info" [size]="14" />
+        Le mouvement sera ajouté à l’historique avec la date du jour.
+      </p>
+    </form>
+  }
+
+  <div dialog-footer>
+    <button type="button" class="kora-btn kora-btn--outline" (click)="restockOpen.set(false)">Annuler</button>
+    <button type="submit" form="restock-form" class="kora-btn kora-btn--primary">Ajouter au stock</button>
+  </div>
+</app-dialog>
+
+<!-- Historique -->
+<app-dialog [(open)]="historyOpen" [title]="historyTarget()?.name ?? 'Historique du stock'" eyebrow="Traçabilité" size="md">
+  @if (historyMovements().length) {
+    <ul class="history-list">
+      @for (movement of historyMovements(); track movement.id) {
+        <li>
+          <span class="history-icon" aria-hidden="true">
+            <app-icon
+              [name]="movement.quantityDelta > 0 ? 'arrow-down' : 'arrow-up'"
+              [size]="15"
+            />
+          </span>
+          <div class="history-main">
+            <p class="history-type">{{ stockMovementLabels[movement.type] }}</p>
+            <p class="history-meta">{{ formatDateTime(movement.createdAt) }} · {{ movementReference(movement) }}</p>
+          </div>
+          <span class="history-qty kora-num" [class.history-qty--in]="movement.quantityDelta > 0">
+            {{ movementSign(movement) }}
+          </span>
+        </li>
+      }
+    </ul>
+  } @else {
+    <p class="history-empty">Aucun mouvement enregistré pour ce produit.</p>
+  }
+
+  <div dialog-footer>
+    <button type="button" class="kora-btn kora-btn--primary" (click)="historyOpen.set(false)">Fermer</button>
+  </div>
+</app-dialog>

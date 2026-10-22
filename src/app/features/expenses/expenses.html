@@ -1,0 +1,270 @@
+<app-page-header
+  eyebrow="Charges"
+  title="Dépenses"
+  subtitle="Loyer, transport, salaires : suivez les sorties de caisse sans les confondre avec le chiffre d’affaires."
+  [crumbs]="[{ label: 'Kora', path: '/tableau-de-bord' }, { label: 'Dépenses' }]"
+>
+  <div page-actions>
+    <button type="button" class="kora-btn kora-btn--outline" (click)="exportCsv()">
+      <app-icon name="download" [size]="16" />
+      Exporter en CSV
+    </button>
+  </div>
+</app-page-header>
+
+<section class="stat-strip" aria-label="Synthèse des dépenses">
+  <article class="stat-mini">
+    <span class="stat-mini__icon"><app-icon name="wallet" [size]="17" /></span>
+    <div>
+      <p class="stat-mini__label">Total filtré</p>
+      <p class="stat-mini__value kora-num">{{ formatXof(filteredTotal()) }}</p>
+      <p class="stat-mini__hint">{{ filteredExpenses().length }} dépense{{ filteredExpenses().length > 1 ? 's' : '' }}</p>
+    </div>
+  </article>
+  <article class="stat-mini">
+    <span class="stat-mini__icon stat-mini__icon--amber"><app-icon name="calendar" [size]="17" /></span>
+    <div>
+      <p class="stat-mini__label">Ce mois-ci</p>
+      <p class="stat-mini__value kora-num">{{ formatXof(monthTotal()) }}</p>
+      <p class="stat-mini__hint">Mois calendaire en cours</p>
+    </div>
+  </article>
+  <article class="stat-mini">
+    <span class="stat-mini__icon"><app-icon name="layers" [size]="17" /></span>
+    <div>
+      <p class="stat-mini__label">Dépense moyenne</p>
+      <p class="stat-mini__value kora-num">{{ formatXof(averageExpense()) }}</p>
+      <p class="stat-mini__hint">Sur la sélection</p>
+    </div>
+  </article>
+  <article class="stat-mini">
+    <span class="stat-mini__icon stat-mini__icon--danger"><app-icon name="tag" [size]="17" /></span>
+    <div>
+      <p class="stat-mini__label">Catégorie principale</p>
+      <p class="stat-mini__value stat-mini__value--sm">{{ topCategoryName() }}</p>
+      <p class="stat-mini__hint">{{ topCategory() ? formatXof(topCategoryAmount()) : 'Aucune dépense' }}</p>
+    </div>
+  </article>
+</section>
+
+<div class="expense-layout">
+  <div class="left-stack">
+    <section class="kora-card form-card" aria-labelledby="expense-form-title">
+      <div class="card-head">
+        <div>
+          <p class="kora-eyebrow">Saisie rapide</p>
+          <h2 id="expense-form-title">Ajouter une dépense</h2>
+        </div>
+        <span class="form-card__badge">Réduit le résultat</span>
+      </div>
+
+      <form (submit)="addExpense(); $event.preventDefault()" novalidate>
+        <div class="field">
+          <label class="kora-label" for="e-label">Libellé <span class="req">*</span></label>
+          <input
+            id="e-label"
+            class="kora-input"
+            [(ngModel)]="draft.label"
+            name="label"
+            placeholder="Ex. Transport marchandises"
+            [attr.aria-invalid]="errors().label ? 'true' : null"
+            [attr.aria-describedby]="errors().label ? 'e-label-error' : null"
+          />
+          @if (errors().label) {
+            <p class="kora-error-text" id="e-label-error"><app-icon name="alert-circle" [size]="14" />{{ errors().label }}</p>
+          }
+        </div>
+
+        <div class="form-row">
+          <div class="field">
+            <label class="kora-label" for="e-category">Catégorie</label>
+            <select id="e-category" class="kora-select" [(ngModel)]="draft.category" name="category">
+              @for (category of categories; track category) {
+                <option [value]="category">{{ category }}</option>
+              }
+            </select>
+          </div>
+          <div class="field">
+            <label class="kora-label" for="e-amount">Montant (FCFA) <span class="req">*</span></label>
+            <input
+              id="e-amount"
+              type="number"
+              min="1"
+              step="100"
+              class="kora-input"
+              [(ngModel)]="draft.amount"
+              name="amount"
+              placeholder="0"
+              [attr.aria-invalid]="errors().amount ? 'true' : null"
+              [attr.aria-describedby]="errors().amount ? 'e-amount-error' : null"
+            />
+            @if (errors().amount) {
+              <p class="kora-error-text" id="e-amount-error"><app-icon name="alert-circle" [size]="14" />{{ errors().amount }}</p>
+            }
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="kora-label" for="e-date">Date</label>
+          <input
+            id="e-date"
+            type="date"
+            class="kora-input"
+            [(ngModel)]="draft.date"
+            name="date"
+            [max]="today"
+            [attr.aria-invalid]="errors().date ? 'true' : null"
+          />
+          @if (errors().date) {
+            <p class="kora-error-text"><app-icon name="alert-circle" [size]="14" />{{ errors().date }}</p>
+          }
+        </div>
+
+        <div class="field">
+          <label class="kora-label" for="e-note">Note (facultatif)</label>
+          <input id="e-note" class="kora-input" [(ngModel)]="draft.note" name="note" placeholder="Fournisseur, justificatif…" />
+        </div>
+
+        <button type="submit" class="kora-btn kora-btn--primary form-submit">
+          <app-icon name="plus" [size]="16" />
+          Enregistrer la dépense
+        </button>
+      </form>
+
+      <div class="callout">
+        <app-icon name="info" [size]="15" />
+        <p>
+          Les dépenses réduisent le <strong>résultat estimé</strong> et la marge nette, jamais le chiffre
+          d’affaires. Les taxes et charges non saisies ne sont pas incluses.
+        </p>
+      </div>
+    </section>
+
+    @if (categoryBreakdown().length) {
+      <section class="kora-card breakdown-card" aria-labelledby="breakdown-title">
+        <div class="card-head">
+          <div>
+            <p class="kora-eyebrow">Répartition</p>
+            <h2 id="breakdown-title">Par catégorie</h2>
+          </div>
+          <span class="breakdown-total kora-num">{{ formatXof(filteredTotal()) }}</span>
+        </div>
+        <ul class="breakdown-list">
+          @for (item of categoryBreakdown(); track item.category) {
+            <li>
+              <div class="breakdown-top">
+                <span>{{ item.category }}</span>
+                <strong class="kora-num">{{ formatXof(item.amount) }}</strong>
+              </div>
+              <div class="bar" role="img" [attr.aria-label]="item.category + ' : ' + item.share + ' % des dépenses'">
+                <span [style.width.%]="item.share"></span>
+              </div>
+              <p class="breakdown-meta">{{ item.share }} %</p>
+            </li>
+          }
+        </ul>
+      </section>
+    }
+  </div>
+
+  <section class="kora-card list-card" aria-labelledby="expenses-list-title">
+    <div class="list-head">
+      <div>
+        <p class="kora-eyebrow">Journal</p>
+        <h2 id="expenses-list-title">Dépenses enregistrées</h2>
+      </div>
+      <span class="list-total kora-num">{{ formatXof(filteredTotal()) }}</span>
+    </div>
+
+    <div class="list-filters">
+      <div class="filter-search">
+        <app-icon name="search" [size]="15" class="filter-search__icon" />
+        <label for="expense-search" class="sr-only">Rechercher une dépense</label>
+        <input
+          id="expense-search"
+          type="search"
+          [value]="search()"
+          (input)="setSearch($event)"
+          placeholder="Rechercher…"
+        />
+      </div>
+
+      <label for="expense-category-filter" class="sr-only">Filtrer par catégorie</label>
+      <select
+        id="expense-category-filter"
+        class="kora-select filter-select"
+        [value]="categoryFilter()"
+        (change)="categoryFilter.set($any($event.target).value)"
+      >
+        <option value="all" [selected]="categoryFilter() === 'all'">Toutes catégories</option>
+        @for (category of categoryOptions(); track category) {
+          <option [value]="category" [selected]="category === categoryFilter()">{{ category }}</option>
+        }
+      </select>
+
+      <div class="kora-segmented" role="group" aria-label="Période des dépenses">
+        <button type="button" [attr.aria-pressed]="period() === '30d'" (click)="period.set('30d')">30 j</button>
+        <button type="button" [attr.aria-pressed]="period() === '90d'" (click)="period.set('90d')">90 j</button>
+        <button type="button" [attr.aria-pressed]="period() === 'all'" (click)="period.set('all')">Tout</button>
+      </div>
+    </div>
+
+    @if (filteredExpenses().length) {
+      <ul class="expense-list">
+        @for (expense of filteredExpenses(); track expense.id) {
+          <li class="expense-row">
+            <span class="expense-icon" aria-hidden="true"><app-icon name="tag" [size]="15" /></span>
+            <div class="expense-main">
+              <div class="expense-top">
+                <span class="expense-label">{{ expense.label }}</span>
+                <span class="expense-category">{{ expense.category }}</span>
+              </div>
+              <p class="expense-meta">
+                {{ formatDateShort(expense.createdAt) }}
+                @if (expense.note) {
+                  · {{ expense.note }}
+                }
+              </p>
+            </div>
+            <span class="expense-amount kora-num">{{ formatXof(expense.amount) }}</span>
+            <button
+              type="button"
+              class="expense-delete"
+              (click)="askDelete(expense)"
+              [attr.aria-label]="'Supprimer la dépense ' + expense.label"
+              title="Supprimer"
+            >
+              <app-icon name="trash" [size]="15" />
+            </button>
+          </li>
+        }
+      </ul>
+    } @else {
+      <app-empty-state
+        icon="wallet"
+        title="Aucune dépense sur cette sélection"
+        message="Ajoutez une dépense avec le formulaire ou élargissez la période et les filtres."
+        [actionLabel]="hasFilters() ? 'Réinitialiser les filtres' : ''"
+        (action)="clearFilters()"
+      />
+    }
+
+    @if (filteredExpenses().length) {
+      <div class="list-foot">
+        <span>{{ filteredExpenses().length }} écriture{{ filteredExpenses().length > 1 ? 's' : '' }}</span>
+        <span>Total <strong class="kora-num">{{ formatXof(filteredTotal()) }}</strong></span>
+      </div>
+    }
+  </section>
+</div>
+
+<app-confirm-dialog
+  [(open)]="deleteOpen"
+  eyebrow="Suppression"
+  title="Supprimer cette dépense ?"
+  [message]="'La dépense « ' + (deleteTarget()?.label ?? '') + ' » sera retirée du journal et le résultat estimé sera recalculé.'"
+  detail="Cette action est définitive pour cette démonstration locale."
+  confirmLabel="Supprimer"
+  tone="danger"
+  (confirmed)="confirmDelete()"
+/>
