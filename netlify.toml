@@ -1,0 +1,9 @@
+[build]
+  command = "npm run build"
+  publish = "dist/kora/browser"
+
+# Serve index.html for client-side routes handled by the Angular router
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
